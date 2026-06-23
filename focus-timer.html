@@ -244,7 +244,7 @@ function completeSession() {
   renderTasks();
   render();
 
-  if (Notification && Notification.permission === 'granted') {
+  if (window.Notification && Notification.permission === 'granted') {
     new Notification(mode === 'focus' ? 'Break over — back to focus!' : 'Focus session done — take a break!');
   }
 }
