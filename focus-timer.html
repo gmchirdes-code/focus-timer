@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Focus Timer</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: rgba(255,255,255,0.05);
+    --accent: #6c8cff;
+    --accent-break: #5ee0a0;
+    --text: #eee;
+    --text-dim: #888;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #app {
+    width: 420px;
+    max-width: 92vw;
+    text-align: center;
+  }
+  #mode {
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    transition: color 0.3s;
+  }
+  #mode.break { color: var(--accent-break); }
+
+  #ring-wrap { position: relative; width: 260px; height: 260px; margin: 0 auto; }
+  svg { transform: rotate(-90deg); }
+  .ring-bg { stroke: rgba(255,255,255,0.08); }
+  .ring-fg { stroke: var(--accent); transition: stroke 0.3s; }
+  #mode.break ~ #ring-wrap .ring-fg, .break-active .ring-fg { stroke: var(--accent-break); }
+
+  #time {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 52px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #controls { margin-top: 28px; display: flex; gap: 10px; justify-content: center; }
+  button {
+    border: none; border-radius: 8px; padding: 10px 18px;
+    background: var(--panel); color: var(--text);
+    font-size: 14px; cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover { background: rgba(255,255,255,0.12); }
+  #startBtn { background: var(--accent); color: #0f1117; font-weight: 600; padding: 10px 26px; }
+  #startBtn:hover { background: #7f9bff; }
+  #startBtn.break { background: var(--accent-break); }
+  #startBtn.break:hover { background: #6fe8ad; }
+
+  #settings {
+    margin-top: 26px;
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  #settings label { display: flex; flex-direction: column; gap: 4px; }
+  #settings input {
+    width: 60px; padding: 6px; text-align: center;
+    border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05); color: var(--text); font-size: 13px;
+  }
+
+  #tasks { margin-top: 30px; text-align: left; }
+  #tasks h2 { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+  #taskInputRow { display: flex; gap: 8px; margin-bottom: 10px; }
+  #taskInput {
+    flex: 1; padding: 9px 12px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05); color: var(--text); font-size: 14px;
+  }
+  #taskInput:focus { outline: 1px solid var(--accent); }
+  #addTaskBtn { padding: 9px 14px; }
+  #taskList { list-style: none; padding: 0; margin: 0; max-height: 180px; overflow-y: auto; }
+  #taskList li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    margin-bottom: 6px; font-size: 14px;
+  }
+  #taskList li.done { opacity: 0.4; text-decoration: line-through; }
+  #taskList li .pomCount { margin-left: auto; font-size: 11px; color: var(--text-dim); }
+  #taskList li button.del {
+    background: none; padding: 2px 6px; font-size: 14px; color: var(--text-dim);
+  }
+  #taskList li button.del:hover { color: #ff6b6b; background: none; }
+  #taskList input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent); }
+
+  #sessionCount { margin-top: 16px; font-size: 12px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="mode">Focus</div>
+  <div id="ring-wrap">
+    <svg width="260" height="260">
+      <circle class="ring-bg" cx="130" cy="130" r="115" stroke-width="12" fill="none"></circle>
+      <circle id="ringFg" class="ring-fg" cx="130" cy="130" r="115" stroke-width="12" fill="none"
+              stroke-linecap="round" stroke-dasharray="722.6" stroke-dashoffset="0"></circle>
+    </svg>
+    <div id="time">25:00</div>
+  </div>
+
+  <div id="controls">
+    <button id="startBtn">Start</button>
+    <button id="resetBtn">Reset</button>
+    <button id="skipBtn">Skip</button>
+  </div>
+
+  <div id="settings">
+    <label>Focus (min)<input type="number" id="focusLen" value="25" min="1" max="120"></label>
+    <label>Short break<input type="number" id="shortLen" value="5" min="1" max="60"></label>
+    <label>Long break<input type="number" id="longLen" value="15" min="1" max="60"></label>
+  </div>
+  <div id="sessionCount">Sessions completed: <span id="sessions">0</span></div>
+
+  <div id="tasks">
+    <h2>Tasks</h2>
+    <div id="taskInputRow">
+      <input id="taskInput" placeholder="What are you working on?" maxlength="80">
+      <button id="addTaskBtn">Add</button>
+    </div>
+    <ul id="taskList"></ul>
+  </div>
+</div>
+
+<audio id="ding" preload="auto">
+  <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" type="audio/wav">
+</audio>
+
+<script>
+// --- State ---
+const STORAGE_KEY = 'focusTimerState_v1';
+let state = {
+  tasks: [],          // {text, done, pomodoros}
+  sessions: 0,
+};
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) Object.assign(state, JSON.parse(raw));
+  } catch (e) {}
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+load();
+
+// --- Timer core ---
+const focusLenEl = document.getElementById('focusLen');
+const shortLenEl = document.getElementById('shortLen');
+const longLenEl = document.getElementById('longLen');
+
+let mode = 'focus'; // 'focus' | 'short' | 'long'
+let remaining = (+focusLenEl.value) * 60;
+let total = remaining;
+let running = false;
+let intervalId = null;
+let activeTaskIndex = null;
+
+const modeEl = document.getElementById('mode');
+const timeEl = document.getElementById('time');
+const ringFg = document.getElementById('ringFg');
+const startBtn = document.getElementById('startBtn');
+const resetBtn = document.getElementById('resetBtn');
+const skipBtn = document.getElementById('skipBtn');
+const sessionsEl = document.getElementById('sessions');
+const ding = document.getElementById('ding');
+
+const CIRC = 2 * Math.PI * 115;
+ringFg.setAttribute('stroke-dasharray', CIRC.toFixed(1));
+
+function modeLengthSeconds(m) {
+  if (m === 'focus') return (+focusLenEl.value) * 60;
+  if (m === 'short') return (+shortLenEl.value) * 60;
+  return (+longLenEl.value) * 60;
+}
+
+function formatTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function render() {
+  timeEl.textContent = formatTime(Math.max(0, Math.ceil(remaining)));
+  const frac = 1 - remaining / total;
+  ringFg.setAttribute('stroke-dashoffset', (CIRC * frac).toFixed(1));
+
+  const isBreak = mode !== 'focus';
+  modeEl.textContent = mode === 'focus' ? 'Focus' : mode === 'short' ? 'Short Break' : 'Long Break';
+  modeEl.classList.toggle('break', isBreak);
+  startBtn.classList.toggle('break', isBreak);
+  startBtn.textContent = running ? 'Pause' : (remaining === total ? 'Start' : 'Resume');
+
+  sessionsEl.textContent = state.sessions;
+  document.title = `${formatTime(Math.max(0, Math.ceil(remaining)))} – ${modeEl.textContent}`;
+}
+
+function tick() {
+  remaining -= 1;
+  if (remaining <= 0) {
+    completeSession();
+    return;
+  }
+  render();
+}
+
+function completeSession() {
+  clearInterval(intervalId);
+  running = false;
+  try { ding.currentTime = 0; ding.play().catch(()=>{}); } catch(e) {}
+
+  if (mode === 'focus') {
+    state.sessions++;
+    if (activeTaskIndex !== null && state.tasks[activeTaskIndex]) {
+      state.tasks[activeTaskIndex].pomodoros++;
+    }
+    mode = (state.sessions % 4 === 0) ? 'long' : 'short';
+  } else {
+    mode = 'focus';
+  }
+  save();
+  remaining = modeLengthSeconds(mode);
+  total = remaining;
+  renderTasks();
+  render();
+
+  if (Notification && Notification.permission === 'granted') {
+    new Notification(mode === 'focus' ? 'Break over — back to focus!' : 'Focus session done — take a break!');
+  }
+}
+
+function startPause() {
+  if (running) {
+    clearInterval(intervalId);
+    running = false;
+  } else {
+    running = true;
+    intervalId = setInterval(tick, 1000);
+  }
+  render();
+}
+
+function reset() {
+  clearInterval(intervalId);
+  running = false;
+  remaining = modeLengthSeconds(mode);
+  total = remaining;
+  render();
+}
+
+function skip() {
+  clearInterval(intervalId);
+  running = false;
+  remaining = 0;
+  completeSession();
+}
+
+startBtn.addEventListener('click', startPause);
+resetBtn.addEventListener('click', reset);
+skipBtn.addEventListener('click', skip);
+
+[focusLenEl, shortLenEl, longLenEl].forEach(el => {
+  el.addEventListener('change', () => {
+    if (!running) {
+      remaining = modeLengthSeconds(mode);
+      total = remaining;
+      render();
+    }
+  });
+});
+
+if (window.Notification && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+
+// --- Tasks ---
+const taskInput = document.getElementById('taskInput');
+const addTaskBtn = document.getElementById('addTaskBtn');
+const taskList = document.getElementById('taskList');
+
+function renderTasks() {
+  taskList.innerHTML = '';
+  state.tasks.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.className = t.done ? 'done' : '';
+    if (i === activeTaskIndex) li.style.outline = '1px solid var(--accent)';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = t.done;
+    cb.addEventListener('change', () => { t.done = cb.checked; save(); renderTasks(); });
+
+    const span = document.createElement('span');
+    span.textContent = t.text;
+    span.style.cursor = 'pointer';
+    span.title = 'Click to set as active task';
+    span.addEventListener('click', () => { activeTaskIndex = i; renderTasks(); });
+
+    const pom = document.createElement('span');
+    pom.className = 'pomCount';
+    pom.textContent = t.pomodoros > 0 ? '🍅'.repeat(Math.min(t.pomodoros, 5)) + (t.pomodoros > 5 ? `+${t.pomodoros-5}` : '') : '';
+
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = '✕';
+    del.addEventListener('click', () => {
+      state.tasks.splice(i, 1);
+      if (activeTaskIndex === i) activeTaskIndex = null;
+      save();
+      renderTasks();
+    });
+
+    li.append(cb, span, pom, del);
+    taskList.appendChild(li);
+  });
+}
+
+function addTask() {
+  const text = taskInput.value.trim();
+  if (!text) return;
+  state.tasks.push({ text, done: false, pomodoros: 0 });
+  taskInput.value = '';
+  save();
+  renderTasks();
+}
+addTaskBtn.addEventListener('click', addTask);
+taskInput.addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
+
+renderTasks();
+render();
+</script>
+</body>
+</html>
